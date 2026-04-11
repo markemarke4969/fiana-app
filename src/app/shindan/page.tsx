@@ -21,7 +21,7 @@ export default function FianaShindan() {
   const [saving, setSaving] = useState(false);
   const [demo, setDemo] = useState(false);
 
-  const [birthday, setBirthday] = useState("");
+  const [birthday, setBirthday] = useState("1980-01-01");
 
   useEffect(() => {
     if (isDemoMode()) {
@@ -152,7 +152,7 @@ export default function FianaShindan() {
                 className="fiana-input w-full"
               />
               <p className="text-xs text-gray-500 mt-2">
-                より精度の高い診断結果に反映されます
+                より精度の高い診断結果に反映されます（初期値は1980年）
               </p>
             </div>
 
