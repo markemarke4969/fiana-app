@@ -49,7 +49,7 @@ export default function FianaShindan() {
   const finalize = async (allAnswers: string[]) => {
     if (!userId) return;
     setSaving(true);
-    const result = calculateDiagnosis(allAnswers);
+    const result = calculateDiagnosis(allAnswers, birthday || undefined);
 
     // 初期資金からlotサイズを自動算出
     const deposit = result.depositHint ?? 300000;

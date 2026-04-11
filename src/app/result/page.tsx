@@ -17,7 +17,9 @@ export default function FianaResult() {
       if (isDemoMode()) {
         const demo = getDemoProfile();
         if (demo?.diagnosis_answers?.length) {
-          setResult(calculateDiagnosis(demo.diagnosis_answers));
+          setResult(
+            calculateDiagnosis(demo.diagnosis_answers, demo.birthday || undefined),
+          );
         } else {
           router.replace("/shindan");
           return;
@@ -38,12 +40,17 @@ export default function FianaResult() {
 
       const { data: profile } = await supabase
         .from("fiana_profiles")
-        .select("diagnosis_answers")
+        .select("diagnosis_answers, birthday")
         .eq("user_id", session.user.id)
         .single();
 
       if (profile?.diagnosis_answers) {
-        setResult(calculateDiagnosis(profile.diagnosis_answers));
+        setResult(
+          calculateDiagnosis(
+            profile.diagnosis_answers,
+            profile.birthday ?? undefined,
+          ),
+        );
       } else {
         const stored = localStorage.getItem("fiana_diagnosis_answers");
         if (stored) {
@@ -95,6 +102,58 @@ export default function FianaResult() {
             ))}
           </div>
         </div>
+
+        {/* 運命数・星座カード（生年月日がある場合のみ） */}
+        {(result.lifePathNumber !== null || result.zodiacSign) && (
+          <div className="fiana-card p-5 mb-6">
+            <h2 className="text-base font-bold text-indigo-400 mb-4 flex items-center gap-2">
+              <span className="text-lg">✨</span>
+              <span>生年月日から読み解くあなた</span>
+            </h2>
+            <div className="grid grid-cols-2 gap-3">
+              {result.lifePathNumber !== null && (
+                <div
+                  className="rounded-xl p-4 border"
+                  style={{
+                    background:
+                      "linear-gradient(135deg, rgba(99,102,241,0.15), rgba(139,92,246,0.08))",
+                    borderColor: "rgba(99,102,241,0.3)",
+                  }}
+                >
+                  <p className="text-[10px] text-indigo-300 mb-1 tracking-wider">
+                    運命数
+                  </p>
+                  <p className="fiana-heading text-3xl font-bold text-white fiana-text-glow mb-2">
+                    {result.lifePathNumber}
+                  </p>
+                  <p className="text-[11px] text-gray-300 leading-snug">
+                    {result.lifePathKeyword}
+                  </p>
+                </div>
+              )}
+              {result.zodiacSign && (
+                <div
+                  className="rounded-xl p-4 border"
+                  style={{
+                    background:
+                      "linear-gradient(135deg, rgba(139,92,246,0.15), rgba(99,102,241,0.08))",
+                    borderColor: "rgba(139,92,246,0.3)",
+                  }}
+                >
+                  <p className="text-[10px] text-purple-300 mb-1 tracking-wider">
+                    星座
+                  </p>
+                  <p className="fiana-heading text-2xl font-bold text-white fiana-text-glow mb-1">
+                    {result.zodiacSign.emoji} {result.zodiacSign.name}
+                  </p>
+                  <p className="text-[11px] text-gray-300 leading-snug">
+                    {result.zodiacSign.keyword}
+                  </p>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
 
         {/* 記述式の本文 */}
         <div className="fiana-card p-6 md:p-8 mb-6">

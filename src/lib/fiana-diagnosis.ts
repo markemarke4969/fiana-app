@@ -3,6 +3,14 @@
 // ========================================
 // 12問の質問 + 生年月日で投資タイプを診断
 // 動物占い風に「積極運用型のライオンタイプ」のような見出し＋長文の記述を返す
+//
+// 動物決定ロジック（生年月日あり）:
+//   1. 診断スコアの上位2つで動物候補プール（3種）を絞り込む
+//   2. 生年月日から決定論的にプール内の1種を選ぶ
+//   → 同じ生年月日でも答えが違えば違う動物、答えが同じでも生年月日で動物が変わる
+//
+// さらに生年月日からは「運命数(1-9)」と「12星座」を算出して表示し
+// 動物占いらしい「当たってる感」を演出する
 
 // ========================================
 // 動物タイプ定義
@@ -260,6 +268,88 @@ export const DIAGNOSIS_QUESTIONS: DiagnosisQuestion[] = [
 ];
 
 // ========================================
+// 12星座データ
+// ========================================
+export interface ZodiacSign {
+  id: string;
+  name: string;
+  emoji: string;
+  dateRange: string;
+  keyword: string;
+}
+
+const ZODIAC_SIGNS: ZodiacSign[] = [
+  { id: "capricorn", name: "山羊座", emoji: "♑", dateRange: "12/22-1/19", keyword: "堅実と野心" },
+  { id: "aquarius", name: "水瓶座", emoji: "♒", dateRange: "1/20-2/18", keyword: "革新と独立" },
+  { id: "pisces", name: "魚座", emoji: "♓", dateRange: "2/19-3/20", keyword: "直感と共感" },
+  { id: "aries", name: "牡羊座", emoji: "♈", dateRange: "3/21-4/19", keyword: "行動と情熱" },
+  { id: "taurus", name: "牡牛座", emoji: "♉", dateRange: "4/20-5/20", keyword: "安定と粘り強さ" },
+  { id: "gemini", name: "双子座", emoji: "♊", dateRange: "5/21-6/21", keyword: "知性と柔軟性" },
+  { id: "cancer", name: "蟹座", emoji: "♋", dateRange: "6/22-7/22", keyword: "慎重と守備力" },
+  { id: "leo", name: "獅子座", emoji: "♌", dateRange: "7/23-8/22", keyword: "自信とリーダーシップ" },
+  { id: "virgo", name: "乙女座", emoji: "♍", dateRange: "8/23-9/22", keyword: "分析と完璧主義" },
+  { id: "libra", name: "天秤座", emoji: "♎", dateRange: "9/23-10/23", keyword: "調和とバランス" },
+  { id: "scorpio", name: "蠍座", emoji: "♏", dateRange: "10/24-11/22", keyword: "集中と洞察力" },
+  { id: "sagittarius", name: "射手座", emoji: "♐", dateRange: "11/23-12/21", keyword: "自由と楽観" },
+];
+
+// ========================================
+// 生年月日 → 12星座
+// ========================================
+export function getZodiacSign(birthday: string): ZodiacSign | null {
+  const d = new Date(birthday);
+  if (isNaN(d.getTime())) return null;
+  const m = d.getMonth() + 1;
+  const day = d.getDate();
+  const code = m * 100 + day;
+
+  if (code >= 1222 || code <= 119) return ZODIAC_SIGNS[0]; // 山羊
+  if (code >= 120 && code <= 218) return ZODIAC_SIGNS[1]; // 水瓶
+  if (code >= 219 && code <= 320) return ZODIAC_SIGNS[2]; // 魚
+  if (code >= 321 && code <= 419) return ZODIAC_SIGNS[3]; // 牡羊
+  if (code >= 420 && code <= 520) return ZODIAC_SIGNS[4]; // 牡牛
+  if (code >= 521 && code <= 621) return ZODIAC_SIGNS[5]; // 双子
+  if (code >= 622 && code <= 722) return ZODIAC_SIGNS[6]; // 蟹
+  if (code >= 723 && code <= 822) return ZODIAC_SIGNS[7]; // 獅子
+  if (code >= 823 && code <= 922) return ZODIAC_SIGNS[8]; // 乙女
+  if (code >= 923 && code <= 1023) return ZODIAC_SIGNS[9]; // 天秤
+  if (code >= 1024 && code <= 1122) return ZODIAC_SIGNS[10]; // 蠍
+  if (code >= 1123 && code <= 1221) return ZODIAC_SIGNS[11]; // 射手
+  return null;
+}
+
+// ========================================
+// 生年月日 → 運命数（1-9）
+// ========================================
+// 生年月日の全桁を1桁になるまで足し続ける（数秘術）
+export function calculateLifePathNumber(birthday: string): number | null {
+  const d = new Date(birthday);
+  if (isNaN(d.getTime())) return null;
+  const digits = `${d.getFullYear()}${d.getMonth() + 1}${d.getDate()}`;
+  let sum = digits.split("").reduce((s, c) => s + parseInt(c, 10), 0);
+  while (sum > 9) {
+    sum = sum
+      .toString()
+      .split("")
+      .reduce((s, c) => s + parseInt(c, 10), 0);
+  }
+  return sum;
+}
+
+// 運命数ごとの短いキーワード（投資観点でカスタム）
+export const LIFE_PATH_KEYWORDS: Record<number, string> = {
+  1: "開拓者：新しい道を切り拓く力を持つ",
+  2: "協調者：パートナーと組むことで成果を出すタイプ",
+  3: "表現者：直感と好奇心で成長を加速させる",
+  4: "建設者：コツコツと揺るぎない土台を築く",
+  5: "挑戦者：変化を恐れず行動で道を開く",
+  6: "調整者：家族や周囲を守る責任感が強い",
+  7: "探究者：深く考え抜いて本質を見抜く",
+  8: "実現者：現実的な成果と富を引き寄せる",
+  9: "賢者：広い視野で全体最適を選べる",
+};
+
+// ========================================
 // 診断結果の型
 // ========================================
 export interface DiagnosisResult {
@@ -271,40 +361,65 @@ export interface DiagnosisResult {
   animal: AnimalType;
   depositHint: number | null;
   assetsHint: number | null;
+  lifePathNumber: number | null;
+  lifePathKeyword: string | null;
+  zodiacSign: ZodiacSign | null;
 }
 
 // ========================================
 // 動物タイプ判定
 // ========================================
-function determineAnimal(scores: Record<string, number>): AnimalType {
+// スコア上位2キーから候補プール（3種）を作り、
+// 生年月日がある場合はプール内から決定論的に1種を選ぶ
+const SCORE_TO_ANIMAL_POOL: Record<string, string[]> = {
+  "stability-patience": ["fox", "owl", "turtle"],
+  "stability-growth": ["dolphin", "fox", "turtle"],
+  "stability-active": ["fox", "cat", "dolphin"],
+  "patience-stability": ["owl", "turtle", "fox"],
+  "patience-growth": ["owl", "turtle", "wolf"],
+  "patience-active": ["owl", "wolf", "lion"],
+  "growth-active": ["eagle", "lion", "wolf"],
+  "growth-stability": ["dolphin", "fox", "owl"],
+  "growth-patience": ["wolf", "owl", "dolphin"],
+  "active-growth": ["lion", "eagle", "wolf"],
+  "active-stability": ["cat", "lion", "fox"],
+  "active-patience": ["wolf", "lion", "owl"],
+};
+
+function birthdaySeed(birthday: string): number {
+  const d = new Date(birthday);
+  if (isNaN(d.getTime())) return 0;
+  return d.getFullYear() * 10000 + (d.getMonth() + 1) * 100 + d.getDate();
+}
+
+function determineAnimal(
+  scores: Record<string, number>,
+  birthday?: string,
+): AnimalType {
   const sorted = Object.entries(scores).sort((a, b) => b[1] - a[1]);
   const top = sorted[0][0];
   const second = sorted[1][0];
   const key = `${top}-${second}`;
+  const pool = SCORE_TO_ANIMAL_POOL[key] || ["dolphin", "owl", "fox"];
 
-  const animalMap: Record<string, string> = {
-    "stability-patience": "fox",
-    "stability-growth": "dolphin",
-    "stability-active": "fox",
-    "patience-stability": "owl",
-    "patience-growth": "turtle",
-    "patience-active": "owl",
-    "growth-active": "eagle",
-    "growth-stability": "dolphin",
-    "growth-patience": "wolf",
-    "active-growth": "lion",
-    "active-stability": "cat",
-    "active-patience": "wolf",
-  };
+  let animalId: string;
+  if (birthday) {
+    const seed = birthdaySeed(birthday);
+    animalId = pool[seed % pool.length];
+  } else {
+    animalId = pool[0];
+  }
 
-  const animalId = animalMap[key] || "dolphin";
   return ANIMAL_TYPES.find((a) => a.id === animalId) || ANIMAL_TYPES[3];
 }
 
 // ========================================
 // 診断結果を算出
 // ========================================
-export function calculateDiagnosis(answers: string[]): DiagnosisResult {
+export function calculateDiagnosis(
+  answers: string[],
+  birthday?: string,
+): DiagnosisResult {
   const scores: Record<string, number> = {
     stability: 0,
     growth: 0,
@@ -329,7 +444,12 @@ export function calculateDiagnosis(answers: string[]): DiagnosisResult {
 
   const sortedTypes = Object.entries(scores).sort((a, b) => b[1] - a[1]);
   const topType = sortedTypes[0][0];
-  const animal = determineAnimal(scores);
+  const animal = determineAnimal(scores, birthday);
+
+  const lifePathNumber = birthday ? calculateLifePathNumber(birthday) : null;
+  const lifePathKeyword =
+    lifePathNumber !== null ? LIFE_PATH_KEYWORDS[lifePathNumber] ?? null : null;
+  const zodiacSign = birthday ? getZodiacSign(birthday) : null;
 
   return {
     type: topType,
@@ -340,5 +460,8 @@ export function calculateDiagnosis(answers: string[]): DiagnosisResult {
     animal,
     depositHint,
     assetsHint,
+    lifePathNumber,
+    lifePathKeyword,
+    zodiacSign,
   };
 }
