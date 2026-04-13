@@ -138,24 +138,24 @@ function FianaSetup() {
                 setSelectedIndex(index);
                 setUseCustom(false);
               }}
-              className={`w-full text-left px-5 py-4 rounded-xl border transition-all ${
+              className={`w-full text-left px-5 py-5 rounded-xl border transition-all ${
                 !useCustom && selectedIndex === index
                   ? "border-indigo-500 bg-indigo-500/10"
                   : "border-white/10 bg-white/5 hover:border-white/20"
               }`}
             >
               <div className="flex items-center justify-between">
-                <div>
-                  <span className="text-lg font-bold text-white">
+                <div className="flex items-baseline gap-3">
+                  <span className="text-2xl font-bold text-white">
                     {option.label}
                   </span>
-                  <span className="text-sm text-gray-500 ml-2">
-                    ({option.lot}lot)
+                  <span className="text-base text-gray-300 font-medium">
+                    {option.lot} lot
                   </span>
                 </div>
                 <div className="text-right">
-                  <span className="text-sm text-green-400 font-medium">
-                    5pips: +¥{option.profitPer5pips.toLocaleString()}
+                  <span className="text-base text-[#2196F3] font-bold">
+                    5pips +¥{option.profitPer5pips.toLocaleString()}
                   </span>
                 </div>
               </div>

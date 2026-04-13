@@ -5,13 +5,29 @@ import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase-browser";
 import { isDemoMode, getDemoProfile, saveDemoProfile } from "@/lib/fiana-demo";
 import { LINE_URL, formatJPY, formatJPYPlain } from "@/lib/fiana-config";
-import { ANIMAL_TYPES } from "@/lib/fiana-diagnosis";
 import {
   HAPPINESS_DAILY_STATS,
   HAPPINESS_RECENT_TRADES,
   scaleByCapital,
   scaleLot,
 } from "@/lib/fiana-happiness-data";
+
+// ========================================
+// MT4 風フォーマッタ（半角スペース区切り・小数点2桁）
+// 例: 1 234 567.89
+// ========================================
+function fmtMT4(n: number): string {
+  const sign = n < 0 ? "-" : "";
+  const [intPart, decPart] = Math.abs(n).toFixed(2).split(".");
+  return `${sign}${intPart.replace(/\B(?=(\d{3})+(?!\d))/g, " ")}.${decPart}`;
+}
+function fmtMT4Signed(n: number): string {
+  return n >= 0 ? `+${fmtMT4(n)}` : fmtMT4(n);
+}
+
+// MT4 損益カラー（MT4 iOS はプラス損益を BUY と同じ青で表示）
+const MT4_RED = "#FF3B30";
+const MT4_BUY = "#2196F3";
 
 // ========================================
 // 型
@@ -105,11 +121,6 @@ export default function FianaDashboard() {
     load();
   }, [router]);
 
-  const animal = useMemo(
-    () => ANIMAL_TYPES.find((a) => a.id === profile?.animal_type) ?? null,
-    [profile?.animal_type],
-  );
-
   if (loading || !profile) {
     return (
       <div className="min-h-screen flex items-center justify-center">
@@ -124,70 +135,59 @@ export default function FianaDashboard() {
     );
   }
 
+  const accountNo = `FIA-${Math.floor(
+    profile.virtual_deposit * 7 + profile.lot_size * 1000 + 100000,
+  )
+    .toString()
+    .slice(0, 7)}`;
+
   return (
-    <div className="min-h-screen pb-28">
-      {/* ヘッダー */}
-      <header
-        className="sticky top-0 z-20 px-4 py-3 border-b backdrop-blur-md"
-        style={{
-          background: "rgba(10,10,15,0.85)",
-          borderColor: "var(--fiana-border)",
-        }}
-      >
-        <div className="max-w-lg mx-auto flex items-center justify-between">
-          <div>
-            <h1 className="fiana-heading text-lg font-bold text-white fiana-text-glow">
-              FIANA
-            </h1>
-            <p className="text-[11px] text-gray-500">
-              {animal ? `${animal.headline}` : "投資体験アプリ"}
-            </p>
+    <div
+      className="min-h-screen bg-black text-white pb-24 relative"
+      style={{ WebkitFontSmoothing: "antialiased" }}
+    >
+      {/* MT4 風タイトルバー */}
+      <header className="sticky top-0 z-20 bg-[#0b0b0b] border-b border-[#1f1f1f]">
+        <div className="max-w-lg mx-auto px-4 h-[46px] flex items-center justify-between">
+          <div className="text-[11px] text-gray-500 font-mono tracking-wider">
+            {accountNo}
+          </div>
+          <div className="text-[14px] font-medium tracking-wide text-white">
+            口座履歴
           </div>
           <a
             href={LINE_URL}
             target="_blank"
             rel="noopener noreferrer"
-            className="text-xs font-bold px-3 py-1.5 rounded-full text-white"
-            style={{ background: "linear-gradient(135deg,#6366f1,#8b5cf6)" }}
+            className="text-[11px] text-[#2196F3] hover:text-blue-300"
           >
-            個別相談
+            相談
           </a>
         </div>
       </header>
 
-      {/* タブ切替 */}
-      <nav className="sticky top-[57px] z-10 px-4 py-3 border-b backdrop-blur-md"
-        style={{
-          background: "rgba(10,10,15,0.8)",
-          borderColor: "var(--fiana-border)",
-        }}
-      >
-        <div className="max-w-lg mx-auto grid grid-cols-3 gap-2">
+      {/* MT4 風タブ（下線アクティブ） */}
+      <nav className="sticky top-[46px] z-10 bg-[#0b0b0b] border-b border-[#1f1f1f]">
+        <div className="max-w-lg mx-auto grid grid-cols-3">
           {[
-            { key: "trial" as const, label: "体験版", icon: "📺" },
-            { key: "backtest" as const, label: "バックテスト", icon: "📊" },
-            { key: "economy" as const, label: "経済指標", icon: "📅" },
+            { key: "trial" as const, label: "履歴" },
+            { key: "backtest" as const, label: "バックテスト" },
+            { key: "economy" as const, label: "ニュース" },
           ].map((t) => {
             const active = tab === t.key;
             return (
               <button
                 key={t.key}
                 onClick={() => setTab(t.key)}
-                className={`py-2.5 rounded-xl text-xs font-bold transition-all border ${
-                  active
-                    ? "text-white border-indigo-500/60"
-                    : "text-gray-400 border-white/10 hover:border-white/20"
+                className={`py-3 text-[13px] font-medium transition-colors ${
+                  active ? "text-white" : "text-gray-500"
                 }`}
-                style={
-                  active
-                    ? {
-                        background:
-                          "linear-gradient(135deg, rgba(99,102,241,0.25), rgba(139,92,246,0.2))",
-                      }
-                    : {}
-                }
+                style={{
+                  borderBottom: active
+                    ? `2px solid ${MT4_BUY}`
+                    : "2px solid transparent",
+                }}
               >
-                <span className="mr-1">{t.icon}</span>
                 {t.label}
               </button>
             );
@@ -196,10 +196,18 @@ export default function FianaDashboard() {
       </nav>
 
       {/* コンテンツ */}
-      <div className="max-w-lg mx-auto px-4 py-5">
+      <div className="max-w-lg mx-auto">
         {tab === "trial" && <TrialTab profile={profile} />}
-        {tab === "backtest" && <BacktestTab profile={profile} />}
-        {tab === "economy" && <EconomyTab profile={profile} />}
+        {tab === "backtest" && (
+          <div className="px-4 py-5">
+            <BacktestTab profile={profile} />
+          </div>
+        )}
+        {tab === "economy" && (
+          <div className="px-4 py-5">
+            <EconomyTab profile={profile} />
+          </div>
+        )}
       </div>
     </div>
   );
@@ -218,12 +226,6 @@ function TrialTab({ profile }: { profile: Profile }) {
   const daysLeft = Math.max(0, TRIAL_DAYS_FREE - daysElapsed);
   const expired = daysLeft <= 0;
   const deposit = profile.virtual_deposit;
-
-  // 口座番号（決定論的に生成）
-  const accountNo = useMemo(() => {
-    const seed = deposit + profile.lot_size * 1000;
-    return `FIA-${Math.floor(seed * 7 + 100000).toString().slice(0, 7)}`;
-  }, [deposit, profile.lot_size]);
 
   // ハピネスプラスの実績データをユーザー資金にスケーリング
   const scaled = useMemo(() => {
@@ -271,197 +273,144 @@ function TrialTab({ profile }: { profile: Profile }) {
 
   const equity = deposit + scaled.totalProfit;
 
+  // 取引を日付でグルーピング（新しい日付が上）
+  const tradesByDate = useMemo(() => {
+    const groups = new Map<string, typeof scaled.trades>();
+    for (const t of scaled.trades) {
+      if (!groups.has(t.date)) groups.set(t.date, []);
+      groups.get(t.date)!.push(t);
+    }
+    return [...groups.entries()].sort((a, b) => b[0].localeCompare(a[0]));
+  }, [scaled.trades]);
+
   return (
-    <div className="space-y-4">
-      {/* トライアル状態 */}
+    <div>
+      {/* 体験版ステータス（MT4 らしさを壊さない薄い帯） */}
       <div
-        className="rounded-2xl p-5 border"
-        style={{
-          background: expired
-            ? "linear-gradient(135deg, rgba(239,68,68,0.15), rgba(234,88,12,0.1))"
-            : "linear-gradient(135deg, rgba(34,197,94,0.12), rgba(16,185,129,0.08))",
-          borderColor: expired
-            ? "rgba(239,68,68,0.35)"
-            : "rgba(34,197,94,0.3)",
-        }}
+        className="px-4 h-[24px] flex items-center justify-between text-[11px] font-mono border-b border-[#1f1f1f] bg-[#0a0a0a]"
+        style={{ letterSpacing: "0.05em" }}
       >
-        <div className="flex items-center justify-between mb-3">
-          <div>
-            <p className="text-[11px] text-gray-400 mb-0.5">
-              ハピネスプラス 体験版（2週間無料）
-            </p>
-            <p
-              className={`text-2xl font-bold ${
-                expired ? "text-red-300" : "text-green-300"
-              }`}
-            >
-              {expired ? "期間終了" : `残り ${daysLeft} 日`}
-            </p>
-          </div>
-          <div className="text-4xl">{expired ? "🔒" : "🟢"}</div>
-        </div>
-        <div className="h-2 bg-white/10 rounded-full overflow-hidden">
-          <div
-            className="h-full rounded-full transition-all"
-            style={{
-              width: `${Math.min(100, (daysElapsed / TRIAL_DAYS_FREE) * 100)}%`,
-              background: expired
-                ? "linear-gradient(90deg,#ef4444,#f97316)"
-                : "linear-gradient(90deg,#22c55e,#10b981)",
-            }}
-          />
-        </div>
+        <span className="text-gray-500">
+          {expired ? "DEMO EXPIRED" : "DEMO ACCOUNT"}
+        </span>
+        <span className={expired ? "text-[#FF3B30]" : "text-gray-500"}>
+          {expired ? "期間終了" : `体験版 残り ${daysLeft} 日`}
+        </span>
       </div>
 
-      {/* MT4風アカウント情報 */}
-      <div className="fiana-card p-5">
-        <div className="flex items-center justify-between mb-4">
-          <h2 className="text-sm font-bold text-gray-300 flex items-center gap-2">
-            <span className="text-lg">📈</span>FIANA Trading Terminal
-          </h2>
-          <span className="text-[10px] font-mono bg-green-500/20 text-green-400 px-2 py-0.5 rounded">
-            LIVE
-          </span>
-        </div>
-
-        <div className="grid grid-cols-2 gap-3 mb-4">
-          <div className="bg-white/5 rounded-lg p-3 border border-white/10">
-            <p className="text-[10px] text-gray-500 mb-1">口座番号</p>
-            <p className="text-sm font-mono text-white">{accountNo}</p>
-          </div>
-          <div className="bg-white/5 rounded-lg p-3 border border-white/10">
-            <p className="text-[10px] text-gray-500 mb-1">稼働システム</p>
-            <p className="text-sm text-white">ハピネスプラス EA</p>
-          </div>
-          <div className="bg-white/5 rounded-lg p-3 border border-white/10">
-            <p className="text-[10px] text-gray-500 mb-1">残高</p>
-            <p className="text-sm font-mono text-white">
-              {formatJPYPlain(deposit)}
-            </p>
-          </div>
-          <div className="bg-white/5 rounded-lg p-3 border border-white/10">
-            <p className="text-[10px] text-gray-500 mb-1">有効証拠金</p>
-            <p className="text-sm font-mono text-green-400">
-              {formatJPYPlain(equity)}
-            </p>
-          </div>
-        </div>
-
-        <div
-          className="rounded-xl p-4 text-center"
-          style={{
-            background:
-              "linear-gradient(135deg, rgba(16,185,129,0.15), rgba(5,150,105,0.08))",
-            border: "1px solid rgba(16,185,129,0.3)",
-          }}
-        >
-          <p className="text-[11px] text-emerald-200/70 mb-1">
-            運用開始からの累計損益
-          </p>
-          <p className="text-3xl font-bold text-emerald-300 mb-1">
-            {formatJPY(scaled.totalProfit)}
-          </p>
-          <p className="text-[11px] text-emerald-200/60">
-            収益率 +{scaled.returnRate.toFixed(2)}% ／ 勝率{" "}
-            {scaled.winRate.toFixed(0)}% ／ {scaled.totalTrades}取引
-          </p>
-        </div>
+      {/* アカウントサマリー */}
+      <div className="px-4 py-3 border-b border-[#1f1f1f] text-[14px] space-y-[3px]">
+        <SummaryRow label="残高:" value={fmtMT4(deposit)} />
+        <SummaryRow label="有効証拠金:" value={fmtMT4(equity)} />
+        <SummaryRow label="損益:" value="0.00" />
+        <SummaryRow label="預託証拠金:" value="0.00" />
+        <SummaryRow label="空き証拠金:" value={fmtMT4(equity)} />
       </div>
 
-      {/* 日次パフォーマンスサマリー */}
-      <div className="fiana-card p-5">
-        <h3 className="text-sm font-bold text-gray-300 mb-3 flex items-center gap-2">
-          <span className="text-lg">📆</span>直近の日次パフォーマンス
-        </h3>
-        <div className="space-y-1">
-          {[...scaled.dailyStats]
-            .slice(-10)
-            .reverse()
-            .map((d) => (
-              <div
-                key={d.date}
-                className="flex items-center justify-between py-2 border-b border-white/5 text-[12px]"
-              >
-                <span className="text-gray-400 font-mono">
-                  {d.date.slice(5)}
-                </span>
-                <span className="text-gray-500 font-mono">
-                  {d.wins}勝{d.losses}敗
-                </span>
-                <span
-                  className={`font-bold font-mono ${
-                    d.profit >= 0 ? "text-green-400" : "text-red-400"
-                  }`}
-                >
-                  {formatJPY(d.profit)}
-                </span>
-              </div>
-            ))}
-        </div>
-      </div>
-
-      {/* 取引ログ（MT4風） */}
-      <div className="fiana-card p-4">
-        <h3 className="text-xs font-bold text-gray-400 mb-3">
-          ▼ 直近の取引履歴
-        </h3>
-        <div className="space-y-1 font-mono text-[10px]">
-          <div className="grid grid-cols-6 gap-1 pb-1 border-b border-white/10 text-gray-600">
-            <span>日時</span>
-            <span>通貨</span>
-            <span>方向</span>
-            <span className="text-right">Lot</span>
-            <span className="text-right">pips</span>
-            <span className="text-right">損益</span>
-          </div>
-          {scaled.trades.map((t) => (
-            <div
-              key={t.id}
-              className="grid grid-cols-6 gap-1 py-1.5 border-b border-white/5 text-gray-300"
-            >
-              <span>{t.date.slice(5)}</span>
-              <span>{t.pair}</span>
-              <span
-                className={
-                  t.direction === "BUY" ? "text-indigo-400" : "text-orange-400"
-                }
-              >
-                {t.direction}
-              </span>
-              <span className="text-right">{t.lot.toFixed(2)}</span>
-              <span
-                className={`text-right ${
-                  t.pips >= 0 ? "text-green-400" : "text-red-400"
-                }`}
-              >
-                {t.pips > 0 ? "+" : ""}
-                {t.pips.toFixed(1)}
+      {/* 日付ごとの取引履歴 */}
+      {tradesByDate.map(([date, trades]) => {
+        const dayTotal = trades.reduce((s, t) => s + t.profit, 0);
+        return (
+          <div key={date}>
+            {/* 日付セパレータ（MT4 の "2026.04.10" スタイル） */}
+            <div className="px-4 h-[28px] flex items-center justify-between bg-[#111] border-b border-[#1f1f1f] text-[12px] font-mono">
+              <span className="text-gray-400">
+                {date.replace(/-/g, ".")}
               </span>
               <span
-                className={`text-right ${
-                  t.profit >= 0 ? "text-green-400" : "text-red-400"
-                }`}
+                style={{ color: dayTotal >= 0 ? MT4_BUY : MT4_RED }}
               >
-                {formatJPY(t.profit)}
+                {fmtMT4Signed(dayTotal)}
               </span>
             </div>
-          ))}
-        </div>
+
+            {/* 取引行（2行: 種別/Lot/損益 + 時刻/価格） */}
+            {trades.map((t) => (
+              <div
+                key={t.id}
+                className="px-4 py-2 border-b border-[#1a1a1a]"
+              >
+                <div className="flex items-baseline justify-between text-[14px] font-mono">
+                  <span className="text-white">
+                    {t.pair},{" "}
+                    <span
+                      style={{
+                        color:
+                          t.direction === "BUY" ? MT4_BUY : MT4_RED,
+                      }}
+                    >
+                      {t.direction.toLowerCase()}
+                    </span>{" "}
+                    {t.lot.toFixed(2)}
+                  </span>
+                  <span
+                    style={{
+                      color: t.profit >= 0 ? MT4_BUY : MT4_RED,
+                    }}
+                  >
+                    {fmtMT4Signed(t.profit)}
+                  </span>
+                </div>
+                <div className="flex items-baseline justify-between text-[12px] font-mono text-gray-500 mt-0.5">
+                  <span>
+                    {date.replace(/-/g, ".")} {t.time}
+                  </span>
+                  <span>
+                    {t.entryPrice.toFixed(3)} → {t.exitPrice.toFixed(3)}
+                  </span>
+                </div>
+              </div>
+            ))}
+          </div>
+        );
+      })}
+
+      {/* 合計 */}
+      <div className="px-4 py-3 bg-[#0a0a0a] border-b border-[#1f1f1f] flex items-baseline justify-between text-[14px] font-mono">
+        <span className="text-gray-400">合計:</span>
+        <span
+          style={{
+            color: scaled.totalProfit >= 0 ? MT4_BUY : MT4_RED,
+          }}
+          className="font-bold"
+        >
+          {fmtMT4Signed(scaled.totalProfit)}
+        </span>
       </div>
 
-      {/* 相談CTA */}
-      <ConsultCTA
-        headline={
-          expired
-            ? "体験期間が終了しました"
-            : `あなたの${formatJPYPlain(deposit)}で実運用に切り替える前に`
-        }
-        body={
-          expired
-            ? "実際の運用に切り替えるかどうか、資産運用アドバイザーと個別に相談できます。"
-            : `体験中の実績（${formatJPY(scaled.totalProfit)} / 収益率 +${scaled.returnRate.toFixed(1)}%）をもとに、あなた専用の運用プランを無料で作成します。`
-        }
-      />
+      {/* サブサマリー（取引数・勝率・収益率） */}
+      <div className="px-4 py-2 border-b border-[#1f1f1f] text-[12px] font-mono text-gray-500 flex items-baseline justify-between">
+        <span>取引数: {scaled.totalTrades}</span>
+        <span>勝率: {scaled.winRate.toFixed(1)}%</span>
+        <span style={{ color: MT4_BUY }}>
+          +{scaled.returnRate.toFixed(2)}%
+        </span>
+      </div>
+
+      {/* 相談CTA（MT4 画面外） */}
+      <div className="px-4 py-5">
+        <ConsultCTA
+          headline={
+            expired
+              ? "体験期間が終了しました"
+              : `あなたの${formatJPYPlain(deposit)}で実運用に切り替える前に`
+          }
+          body={
+            expired
+              ? "実際の運用に切り替えるかどうか、資産運用アドバイザーと個別に相談できます。"
+              : `体験中の実績（${formatJPY(scaled.totalProfit)} / 収益率 +${scaled.returnRate.toFixed(1)}%）をもとに、あなた専用の運用プランを無料で作成します。`
+          }
+        />
+      </div>
+    </div>
+  );
+}
+
+function SummaryRow({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="flex items-baseline justify-between">
+      <span className="text-gray-400">{label}</span>
+      <span className="text-white font-mono">{value}</span>
     </div>
   );
 }

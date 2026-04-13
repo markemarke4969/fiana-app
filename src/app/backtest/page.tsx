@@ -363,10 +363,10 @@ export default function BacktestPage() {
                   <button
                     key={opt.amount}
                     onClick={() => setDeposit(opt.amount)}
-                    className={`py-2 px-3 rounded-xl text-sm font-medium border transition-all ${
+                    className={`py-3 px-3 rounded-xl text-lg font-bold border transition-all ${
                       deposit === opt.amount
                         ? "border-indigo-500 bg-indigo-500/20 text-white"
-                        : "border-white/10 bg-white/5 text-gray-400 hover:border-white/20"
+                        : "border-white/10 bg-white/5 text-gray-300 hover:border-white/20"
                     }`}
                   >
                     {opt.label}
