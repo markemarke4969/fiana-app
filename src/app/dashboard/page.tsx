@@ -84,7 +84,7 @@ export default function FianaDashboard() {
         data: { session },
       } = await supabase.auth.getSession();
       if (!session) {
-        router.replace("/register");
+        router.replace("/login");
         return;
       }
 
